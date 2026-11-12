@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Public Cab - Customer & Driver App</title>
+    <meta name="theme-color" content="#facc15">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: #ffffff;
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            padding-bottom: 75px;
+        }
+        .map-bg {
+            background-color: #e5e7eb;
+            background-image: radial-gradient(#9ca3af 1px, transparent 1px), radial-gradient(#9ca3af 1px, #e5e7eb 1px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+        .pulse-dot {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(234, 179, 8, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container" id="app">
+    
+    <!-- Top Header & Role Switcher -->
+    <header class="bg-yellow-400 text-gray-900 p-4 sticky top-0 z-50 shadow-md flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <div class="bg-gray-900 text-yellow-400 p-2 rounded-lg font-bold">
+                <i class="fa-solid fa-taxi"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg leading-tight">Public Cab</h1>
+                <p class="text-xs font-medium text-gray-800" id="header-subtitle">Customer Mode</p>
+            </div>
+        </div>
+
+        <!-- Role Toggle Switch -->
+        <div class="bg-gray-900 p-1 rounded-full flex items-center text-xs font-bold">
+            <button onclick="switchRole('customer')" id="btn-customer" class="px-3 py-1.5 rounded-full bg-yellow-400 text-gray-900 transition">Customer</button>
+            <button onclick="switchRole('driver')" id="btn-driver" class="px-3 py-1.5 rounded-full text-white transition">Driver</button>
+        </div>
+    </header>
+
+    <!-- PWA Install Banner (Hidden by default, shows when installable) -->
+    <div id="install-banner" class="hidden bg-gray-900 text-white px-4 py-2.5 flex justify-between items-center text-sm">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-mobile-screen-button text-yellow-400 text-lg"></i>
+            <span>অ্যাপটি মোবাইলে ইন্সটল করুন</span>
+        </div>
+        <button id="install-btn" class="bg-yellow-400 text-gray-900 font-bold px-3 py-1 rounded text-xs">Install</button>
+    </div>
+
+    <!-- ==================== CUSTOMER VIEW ==================== -->
+    <main id="customer-view" class="block">
+        <!-- Live Map Simulation -->
+        <div class="map-bg h-56 relative flex items-center justify-center border-b border-gray-300 overflow-hidden">
+            <div class="text-center">
+                <div class="w-4 h-4 bg-yellow-500 rounded-full mx-auto pulse-dot border-2 border-white"></div>
+                <span class="bg-white/90 px-2 py-0.5 rounded text-xs font-bold shadow mt-1 inline-block">আপনার বর্তমান লোকেশন</span>
+            </div>
+            <!-- Floating Nearby Cabs -->
+            <i class="fa-solid fa-motorcycle text-gray-700 absolute top-8 left-12 text-lg"></i>
+            <i class="fa-solid fa-car-side text-gray-800 absolute bottom-10 right-14 text-xl"></i>
+            <i class="fa-solid fa-truck-pickup text-gray-700 absolute top-14 right-10 text-lg"></i>
+        </div>
+
+        <!-- Booking Panel -->
+        <div class="p-4 space-y-4">
+            <!-- Location Inputs -->
+            <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 space-y-2.5 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-circle-dot text-green-600 text-sm"></i>
+                    <input type="text" id="pickup-loc" placeholder="পিকআপ লোকেশন (যেমন: চাকদহ স্টেশন)" value="চাকদহ স্টেশন রোড" class="w-full bg-transparent text-sm font-medium focus:outline-none border-b border-gray-200 pb-1">
+                </div>
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-location-dot text-red-600 text-sm"></i>
+                    <input type="text" id="drop-loc" placeholder="কোথায় যাবেন? (Drop Location)" class="w-full bg-transparent text-sm font-medium focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Vehicle Selection -->
+            <div>
+                <h2 class="text-xs font-bold text-gray-500 uppercase mb-2">গাড়ি নির্বাচন করুন</h2>
+                <div class="grid grid-cols-4 gap-2 text-center">
+                    <div onclick="selectVehicle('Bike', 40, this)" class="vehicle-card border-2 border-yellow-400 bg-yellow-50 p-2 rounded-xl cursor-pointer">
+                        <i class="fa-solid fa-motorcycle text-2xl text-gray-800 mb-1"></i>
+                        <p class="text-xs font-bold">Bike</p>
+                        <p class="text-xs text-gray-600 font-semibold">₹40</p>
+                    </div>
+                    <div onclick="selectVehicle('Toto / Auto', 60, this)" class="vehicle-card border border-gray-200 p-2 rounded-xl cursor-pointer">
+                        <i class="fa-solid fa-shuttle-van text-2xl text-gray-800 mb-1"></i>
+                        <p class="text-xs font-bold">Toto</p>
+                        <p class="text-xs text-gray-600 font-semibold">₹60</p>
+                    </div>
+                    <div onclick="selectVehicle('Mini Cab', 150, this)" class="vehicle-card border border-gray-200 p-2 rounded-xl cursor-pointer">
+                        <i class="fa-solid fa-car text-2xl text-gray-800 mb-1"></i>
+                        <p class="text-xs font-bold">Cab</p>
+                        <p class="text-xs text-gray-600 font-semibold">₹150</p>
+                    </div>
+                    <div onclick="selectVehicle('Parcel', 50, this)" class="vehicle-card border border-gray-200 p-2 rounded-xl cursor-pointer">
+                        <i class="fa-solid fa-box-open text-2xl text-gray-800 mb-1"></i>
+                        <p class="text-xs font-bold">Parcel</p>
+                        <p class="text-xs text-gray-600 font-semibold">₹50</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Book Now Button -->
+            <button onclick="bookRide()" id="book-btn" class="w-full bg-gray-900 text-yellow-400 font-bold py-3.5 rounded-xl shadow-lg active:scale-95 transition flex justify-center items-center gap-2">
+                <span>রাইড বুক করুন (₹40)</span>
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+
+            <!-- Active Ride Status Box -->
+            <div id="customer-ride-status" class="hidden bg-green-50 border border-green-300 p-4 rounded-xl space-y-2">
+                <div class="flex justify-between items-center">
+                    <span class="bg-green-600 text-white text-xs px-2 py-0.5 rounded font-bold" id="ride-badge">ড্রাইভার খোঁজা হচ্ছে...</span>
+                    <button onclick="cancelRide()" class="text-xs text-red-600 font-bold underline">বাতিল করুন</button>
+                </div>
+                <p class="text-sm font-bold text-gray-800" id="ride-details-text"></p>
+                <p class="text-xs text-gray-600" id="driver-assigned-info">অনুগ্রহ করে অপেক্ষা করুন, কাছাকাছি ড্রাইভারকে রিকোয়েস্ট পাঠানো হয়েছে।</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- ==================== DRIVER VIEW ==================== -->
+    <main id="driver-view" class="hidden p-4 space-y-4">
+        <!-- Driver Duty Status & Wallet -->
+        <div class="bg-gray-900 text-white p-4 rounded-2xl shadow-md flex justify-between items-center">
+            <div>
+                <p class="text-xs text-gray-400">আজকের আয় (Today's Earning)</p>
+                <h2 class="text-2xl font-extrabold text-yellow-400" id="driver-earnings">₹320.00</h2>
+                <p class="text-xs text-green-400 mt-1"><i class="fa-solid fa-circle-check"></i> সাবস্ক্রিপশন অ্যাক্টিভ</p>
+            </div>
+            <div class="text-right">
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="duty-toggle" class="sr-only peer" checked onchange="toggleDuty()">
+                    <div class="w-14 h-7 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-500 relative"></div>
+                </label>
+                <p class="text-xs font-bold mt-1 text-green-400" id="duty-text">ONLINE</p>
+            </div>
+        </div>
+
+        <!-- Incoming Ride Requests -->
+        <div>
+            <h3 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                <i class="fa-solid fa-bell text-yellow-500"></i> নতুন রাইড রিকোয়েস্ট
+            </h3>
+            
+            <div id="no-requests-box" class="bg-gray-50 border border-dashed border-gray-300 p-6 rounded-xl text-center text-gray-500 text-sm">
+                <i class="fa-solid fa-radar text-2xl mb-2 text-gray-400"></i>
+                <p>বর্তমানে কোনো নতুন রাইড রিকোয়েস্ট নেই।</p>
+                <p class="text-xs mt-1">(টেস্ট করতে উপরে Customer মোডে গিয়ে একটি রাইড বুক করুন)</p>
+            </div>
+
+            <!-- Dynamic Request Card -->
+            <div id="driver-request-card" class="hidden bg-white border-2 border-yellow-400 p-4 rounded-xl shadow-md space-y-3">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="bg-yellow-400 text-gray-900 text-xs font-extrabold px-2.5 py-1 rounded" id="req-vehicle-type">Bike Ride</span>
+                    <span class="text-lg font-extrabold text-green-600" id="req-fare">₹40</span>
+                </div>
+                <div class="space-y-1.5 text-sm">
+                    <p><i class="fa-solid fa-circle-dot text-green-600 mr-2"></i><strong id="req-pickup">চাকদহ স্টেশন</strong></p>
+                    <p><i class="fa-solid fa-location-dot text-red-600 mr-2"></i><strong id="req-drop">বাজার পাড়া</strong></p>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pt-2" id="driver-action-btns">
+                    <button onclick="rejectRide()" class="bg-gray-200 text-gray-800 font-bold py-2.5 rounded-lg text-sm">Reject</button>
+                    <button onclick="acceptRide()" class="bg-green-600 text-white font-bold py-2.5 rounded-lg text-sm shadow">Accept Ride</button>
+                </div>
+                <div id="driver-complete-box" class="hidden pt-2">
+                    <button onclick="completeRide()" class="w-full bg-gray-900 text-yellow-400 font-bold py-2.5 rounded-lg text-sm">রাইড সম্পন্ন করুন (Complete)</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 w-full max-w-[480px] bg-white border-t border-gray-200 flex justify-around py-2.5 text-xs font-semibold text-gray-600 z-50">
+        <button onclick="showTab('home')" class="flex flex-col items-center text-yellow-600">
+            <i class="fa-solid fa-house text-lg mb-0.5"></i>
+            <span>হোম</span>
+        </button>
+        <button onclick="alert('আপনার সাম্প্রতিক কোনো রাইড হিস্ট্রি নেই।')" class="flex flex-col items-center hover:text-gray-900">
+            <i class="fa-solid fa-clock-rotate-left text-lg mb-0.5"></i>
+            <span>হিস্ট্রি</span>
+        </button>
+        <a href="tel:9609546435" class="flex flex-col items-center hover:text-gray-900">
+            <i class="fa-solid fa-headset text-lg mb-0.5 text-green-600"></i>
+            <span>সাপোর্ট</span>
+        </a>
+    </nav>
+
+</div>
+
+<!-- ==================== JAVASCRIPT & PWA LOGIC ==================== -->
+<script>
+    // App State
+    let selectedVehicle = 'Bike';
+    let selectedFare = 40;
+    let activeRide = null;
+    let driverEarnings = 320;
+
+    // 1. Switch between Customer & Driver Mode
+    function switchRole(role) {
+        const custView = document.getElementById('customer-view');
+        const drvView = document.getElementById('driver-view');
+        const btnCust = document.getElementById('btn-customer');
+        const btnDrv = document.getElementById('btn-driver');
+        const subtitle = document.getElementById('header-subtitle');
+
+        if (role === 'customer') {
+            custView.classList.remove('hidden');
+            drvView.classList.add('hidden');
+            btnCust.className = 'px-3 py-1.5 rounded-full bg-yellow-400 text-gray-900 transition';
+            btnDrv.className = 'px-3 py-1.5 rounded-full text-white transition';
+            subtitle.innerText = 'Customer Mode';
+        } else {
+            custView.classList.add('hidden');
+            drvView.classList.remove('hidden');
+            btnDrv.className = 'px-3 py-1.5 rounded-full bg-yellow-400 text-gray-900 transition';
+            btnCust.className = 'px-3 py-1.5 rounded-full text-white transition';
+            subtitle.innerText = 'Driver Partner Mode';
+            syncDriverDashboard();
+        }
+    }
+
+    // 2. Select Vehicle Type
+    function selectVehicle(name, fare, element) {
+        selectedVehicle = name;
+        selectedFare = fare;
+        
+        document.querySelectorAll('.vehicle-card').forEach(card => {
+            card.classList.remove('border-2', 'border-yellow-400', 'bg-yellow-50');
+            card.classList.add('border', 'border-gray-200');
+        });
+        
+        element.classList.remove('border', 'border-gray-200');
+        element.classList.add('border-2', 'border-yellow-400', 'bg-yellow-50');
+        
+        document.getElementById('book-btn').innerHTML = `<span>রাইড বুক করুন (₹${fare})</span> <i class="fa-solid fa-arrow-right"></i>`;
+    }
+
+    // 3. Book a Ride (Customer Action)
+    function bookRide() {
+        const pickup = document.getElementById('pickup-loc').value.trim();
+        const drop = document.getElementById('drop-loc').value.trim();
+
+        if (!pickup || !drop) {
+            alert('অনুগ্রহ করে পিকআপ এবং ড্রপ লোকেশন লিখুন!');
+            return;
+        }
+
+        activeRide = {
+            vehicle: selectedVehicle,
+            fare: selectedFare,
+            pickup: pickup,
+            drop: drop,
+            status: 'searching'
+        };
+
+        document.getElementById('book-btn').classList.add('hidden');
+        const statusBox = document.getElementById('customer-ride-status');
+        statusBox.classList.remove('hidden');
+        document.getElementById('ride-badge').innerText = 'ড্রাইভার খোঁজা হচ্ছে...';
+        document.getElementById('ride-details-text').innerText = `${selectedVehicle} | ${pickup} ➔ ${drop} (₹${selectedFare})`;
+        document.getElementById('driver-assigned-info').innerText = 'অনুগ্রহ করে অপেক্ষা করুন। (এখন উপরে Driver বাটনে ক্লিক করে রিকোয়েস্টটি Accept করুন)';
+    }
+
+    // 4. Sync Ride Request to Driver Dashboard
+    function syncDriverDashboard() {
+        const isOnline = document.getElementById('duty-toggle').checked;
+        const noReq = document.getElementById('no-requests-box');
+        const reqCard = document.getElementById('driver-request-card');
+
+        if (activeRide && isOnline) {
+            noReq.classList.add('hidden');
+            reqCard.classList.remove('hidden');
+            document.getElementById('req-vehicle-type').innerText = activeRide.vehicle;
+            document.getElementById('req-fare').innerText = '₹' + activeRide.fare;
+            document.getElementById('req-pickup').innerText = activeRide.pickup;
+            document.getElementById('req-drop').innerText = activeRide.drop;
+
+            if (activeRide.status === 'accepted') {
+                document.getElementById('driver-action-btns').classList.add('hidden');
+                document.getElementById('driver-complete-box').classList.remove('hidden');
+            } else {
+                document.getElementById('driver-action-btns').classList.remove('hidden');
+                document.getElementById('driver-complete-box').classList.add('hidden');
+            }
+        } else {
+            noReq.classList.remove('hidden');
+            reqCard.classList.add('hidden');
+        }
+    }
+
+    // 5. Driver Actions (Accept / Reject / Complete)
+    function acceptRide() {
+        if (!activeRide) return;
+        activeRide.status = 'accepted';
+        document.getElementById('driver-action-btns').classList.add('hidden');
+        document.getElementById('driver-complete-box').classList.remove('hidden');
+        
+        // Update Customer View
+        document.getElementById('ride-badge').innerText = 'ড্রাইভার আসছেন (Accepted)';
+        document.getElementById('driver-assigned-info').innerText = 'ড্রাইভার আপনার রাইডটি গ্রহণ করেছেন এবং লোকেশনে আসছেন। কল করতে সাপোর্টে যোগাযোগ করুন: 9609546435';
+        alert('রাইড Accept করা হয়েছে!');
+    }
+
+    function rejectRide() {
+        cancelRide();
+        syncDriverDashboard();
+    }
+
+    function completeRide() {
+        if (!activeRide) return;
+        driverEarnings += activeRide.fare;
+        document.getElementById('driver-earnings').innerText = '₹' + driverEarnings.toFixed(2);
+        alert(`রাইড সম্পন্ন হয়েছে! ₹${activeRide.fare} আপনার ওয়ালেটে যুক্ত হয়েছে।`);
+        cancelRide();
+        syncDriverDashboard();
+    }
+
+    function cancelRide() {
+        activeRide = null;
+        document.getElementById('book-btn').classList.remove('hidden');
+        document.getElementById('customer-ride-status').classList.add('hidden');
+    }
+
+    function toggleDuty() {
+        const isOnline = document.getElementById('duty-toggle').checked;
+        const dutyText = document.getElementById('duty-text');
+        dutyText.innerText = isOnline ? 'ONLINE' : 'OFFLINE';
+        dutyText.className = isOnline ? 'text-xs font-bold mt-1 text-green-400' : 'text-xs font-bold mt-1 text-red-400';
+        syncDriverDashboard();
+    }
+
+    // ==================== PWA MANIFEST & SERVICE WORKER (SINGLE FILE) ====================
+    // Dynamic Manifest Generation so the app can be installed from a single HTML file
+    const manifestData = {
+        name: "Public Cab App",
+        short_name: "PublicCab",
+        start_url: ".",
+        display: "standalone",
+        background_color: "#ffffff",
+        theme_color: "#facc15",
+        icons: [{
+            src: "https://cdn-icons-png.flaticon.com/512/3097/3097180.png",
+            sizes: "512x512",
+            type: "image/png"
+        }]
+    };
+    const stringManifest = JSON.stringify(manifestData);
+    const blob = new Blob([stringManifest], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(blob);
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = manifestURL;
+    document.head.appendChild(link);
+
+    // Inline Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        const swCode = `
+            self.addEventListener('install', (e) => self.skipWaiting());
+            self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => new Response('Offline'))));
+        `;
+        const swBlob = new Blob([swCode], {type: 'application/javascript'});
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+    }
+
+    // Handle Install Prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        document.getElementById('install-banner').classList.remove('hidden');
+    });
+
+    document.getElementById('install-btn').addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                document.getElementById('install-banner').classList.add('hidden');
+            }
+            deferredPrompt = null;
+        }
+    });
+</script>
+
+</body>
+</html>
